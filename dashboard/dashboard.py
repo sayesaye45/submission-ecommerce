@@ -6,8 +6,8 @@ import seaborn as sns
 st.set_page_config(page_title="E-Commerce Dashboard", layout="wide")
 
 # Load data
-df = pd.read_csv("main_data.csv")
-rfm_df = pd.read_csv("rfm_data.csv")
+df = pd.read_csv("dashboard/main_data.csv")
+rfm_df = pd.read_csv("dashboard/rfm_data.csv")
 
 st.title("Brazilian E-Commerce Dashboard")
 
