@@ -1,326 +1,190 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
+import matplotlib.ticker as mtick
 import seaborn as sns
 
-st.set_page_config(
-    page_title="Brazilian E-Commerce Dashboard",
-    page_icon="🛒",
-    layout="wide"
-)
+st.set_page_config(page_title="Brazilian E-Commerce Dashboard", 
+                   page_icon="🛒", layout="wide")
 
-# ============================================================
-# LOAD DATA dengan cache agar hemat RAM
-# ============================================================
-@st.cache_data
-def load_main():
-    df = pd.read_csv("dashboard/main_data.csv")
-    df['order_purchase_timestamp'] = pd.to_datetime(df['order_purchase_timestamp'])
-    return df
+# Load data
+df = pd.read_csv("dashboard/main_data.csv")
+rfm_df = pd.read_csv("dashboard/rfm_data.csv")
+df['order_purchase_timestamp'] = pd.to_datetime(df['order_purchase_timestamp'])
 
-@st.cache_data
-def load_rfm():
-    return pd.read_csv("dashboard/rfm_data.csv")
-
-df = load_main()
-rfm_df = load_rfm()
-
-# ============================================================
-# SIDEBAR — FILTER INTERAKTIF (KRITERIA WAJIB)
-# ============================================================
-st.sidebar.title("🔽 Filter Data")
-st.sidebar.markdown("Gunakan filter di bawah untuk menyaring data pada semua visualisasi.")
+# SIDEBAR
+st.sidebar.image("https://flagcdn.com/w80/br.png", width=60)
+st.sidebar.title("🛒 E-Commerce Brasil")
 st.sidebar.markdown("---")
 
-# Filter 1: Rentang Tanggal
-min_date = df['order_purchase_timestamp'].min().date()
-max_date = df['order_purchase_timestamp'].max().date()
+min_date = df['order_purchase_timestamp'].min()
+max_date = df['order_purchase_timestamp'].max()
 
-date_range = st.sidebar.date_input(
-    "📅 Rentang Tanggal Order",
-    value=[min_date, max_date],
-    min_value=min_date,
-    max_value=max_date
-)
+start_date = st.sidebar.date_input("Tanggal Mulai", min_date)
+end_date = st.sidebar.date_input("Tanggal Akhir", max_date)
 
-if len(date_range) == 2:
-    start_date, end_date = date_range
-else:
-    start_date, end_date = min_date, max_date
+states = ["Semua"] + sorted(df['customer_state'].dropna().unique().tolist())
+selected_state = st.sidebar.selectbox("Negara Bagian", states)
 
-# Filter 2: Negara Bagian
-all_states = sorted(df['customer_state'].unique().tolist())
-selected_states = st.sidebar.multiselect(
-    "🗺️ Pilih Negara Bagian",
-    options=all_states,
-    default=all_states
-)
-
-# Filter 3: Segmen RFM
-all_segments = sorted(rfm_df['Segment'].unique().tolist())
-selected_segments = st.sidebar.multiselect(
-    "👥 Pilih Segmen Pelanggan",
-    options=all_segments,
-    default=all_segments
-)
+filtered_df = df[
+    (df['order_purchase_timestamp'] >= pd.Timestamp(start_date)) &
+    (df['order_purchase_timestamp'] <= pd.Timestamp(end_date))
+]
+if selected_state != "Semua":
+    filtered_df = filtered_df[filtered_df['customer_state'] == selected_state]
 
 st.sidebar.markdown("---")
-st.sidebar.caption("📦 Brazilian E-Commerce Public Dataset © Olist")
-st.sidebar.caption("🔗 [Sumber Dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)")
+st.sidebar.metric("Total Order", f"{filtered_df['order_id'].nunique():,}")
+st.sidebar.metric("Total Revenue", f"R$ {filtered_df['payment_value'].sum():,.0f}")
 
-# ============================================================
-# TERAPKAN FILTER KE DATA MENTAH
-# ============================================================
-df_filtered = df[
-    (df['order_purchase_timestamp'].dt.date >= start_date) &
-    (df['order_purchase_timestamp'].dt.date <= end_date) &
-    (df['customer_state'].isin(selected_states) if selected_states else df['customer_state'].notna())
-]
-
-rfm_filtered = rfm_df[
-    rfm_df['Segment'].isin(selected_segments) if selected_segments else rfm_df['Segment'].notna()
-]
-
-# ============================================================
 # HEADER
-# ============================================================
 st.title("🛒 Brazilian E-Commerce Dashboard")
-st.markdown("""
-Dashboard ini menyajikan analisis data transaksi e-commerce Brasil dari platform **Olist** (2016–2018).  
-Gunakan **filter di sidebar kiri** untuk menyaring data berdasarkan tanggal, wilayah, dan segmen pelanggan.
-""")
-
-total_orders = df_filtered['order_id'].nunique()
-total_customers = df_filtered['customer_id'].nunique()
-st.caption(f"📊 Menampilkan **{total_orders:,}** order dari **{total_customers:,}** pelanggan sesuai filter.")
+st.markdown("Analisis data e-commerce Brasil periode 2016-2018")
 st.markdown("---")
 
-# ============================================================
-# KPI METRICS
-# ============================================================
-st.subheader("📊 Ringkasan Performa")
-
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.metric("🛍️ Total Order", f"{total_orders:,}")
-with col2:
-    st.metric("👥 Total Pelanggan", f"{total_customers:,}")
-with col3:
-    if 'payment_value' in df_filtered.columns:
-        total_rev = df_filtered['payment_value'].sum()
-        st.metric("💰 Total Pendapatan", f"R$ {total_rev:,.0f}")
-with col4:
-    if 'payment_value' in df_filtered.columns and total_orders > 0:
-        avg_order = df_filtered['payment_value'].mean()
-        st.metric("🧾 Rata-rata per Order", f"R$ {avg_order:,.0f}")
+# KPI
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Total Order", f"{filtered_df['order_id'].nunique():,}")
+c2.metric("Total Revenue", f"R$ {filtered_df['payment_value'].sum()/1e6:.1f}M")
+c3.metric("Total Pelanggan", f"{filtered_df['customer_id'].nunique():,}")
+c4.metric("Rata-rata Nilai Order", f"R$ {filtered_df['payment_value'].mean():.0f}")
 
 st.markdown("---")
 
-# ============================================================
-# VISUALISASI 1: TREN PENJUALAN BULANAN
-# ============================================================
-st.subheader("📈 Tren Penjualan Bulanan")
-st.markdown("""
-**Tujuan:** Melihat pola penjualan dari waktu ke waktu untuk mengidentifikasi tren pertumbuhan,  
-penurunan, serta momen puncak yang dapat dimanfaatkan untuk strategi promosi.
-""")
+# TAB
+tab1, tab2, tab3 = st.tabs(["📈 Tren Penjualan", "🗺️ Distribusi Wilayah", "👥 RFM Analysis"])
 
-df_filtered['order_month_str'] = df_filtered['order_purchase_timestamp'].dt.to_period('M').astype(str)
-monthly = df_filtered.groupby('order_month_str')['order_id'].nunique().sort_index()
+with tab1:
+    st.subheader("Tren Penjualan Bulanan (2016-2018)")
+    filtered_df['order_month'] = filtered_df['order_purchase_timestamp'].dt.to_period('M').astype(str)
+    monthly = filtered_df.groupby('order_month')['order_id'].nunique()
 
-if monthly.empty:
-    st.warning("⚠️ Tidak ada data untuk filter yang dipilih.")
-else:
     fig, ax = plt.subplots(figsize=(12, 4))
-
-    # Highlight bulan terbaik
-    colors = ['#1565C0' if v == monthly.max() else '#90CAF9' for v in monthly.values]
-    bars = ax.bar(range(len(monthly)), monthly.values, color=colors, edgecolor='none')
-
+    bars = ax.bar(range(len(monthly)), monthly.values, color='steelblue', alpha=0.8)
+    max_idx = monthly.values.argmax()
+    bars[max_idx].set_color('#FF5722')
     ax.set_xticks(range(len(monthly)))
     ax.set_xticklabels(monthly.index, rotation=45, ha='right', fontsize=8)
-    ax.set_xlabel("Bulan", fontsize=11)
-    ax.set_ylabel("Jumlah Order", fontsize=11)
-    ax.set_title("Jumlah Order per Bulan", fontsize=13, fontweight='bold')
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
-    # Hapus border atas & kanan (prinsip visualisasi bersih)
+    ax.set_ylabel('Jumlah Order')
+    ax.set_title('Tren Jumlah Order per Bulan')
+    ax.yaxis.set_major_formatter(mtick.FuncFormatter(lambda x, _: f'{int(x):,}'))
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     plt.tight_layout()
     st.pyplot(fig)
     plt.close()
 
-    peak = monthly.idxmax()
-    st.info(f"💡 **Insight:** Penjualan tertinggi terjadi pada **{peak}** dengan **{monthly.max():,}** order "
-            f"(ditandai warna biru tua). Kemungkinan bertepatan dengan event promosi nasional Brasil.")
-
-st.markdown("---")
-
-# ============================================================
-# VISUALISASI 2: TOP KATEGORI PRODUK
-# ============================================================
-if 'product_category_name_english' in df_filtered.columns:
-    st.subheader("📦 Top 10 Kategori Produk Terlaris")
-    st.markdown("""
-    **Tujuan:** Mengidentifikasi kategori produk dengan permintaan tertinggi  
-    untuk mendukung keputusan manajemen stok dan strategi pemasaran produk.
-    """)
-
-    cat_orders = (
-        df_filtered.groupby('product_category_name_english')['order_id']
-        .nunique()
-        .sort_values(ascending=True)
-        .tail(10)
-    )
-
-    if cat_orders.empty:
-        st.warning("⚠️ Tidak ada data kategori untuk filter yang dipilih.")
-    else:
-        fig2, ax2 = plt.subplots(figsize=(10, 5))
-        colors_cat = ['#1B5E20' if i == len(cat_orders) - 1 else '#A5D6A7' for i in range(len(cat_orders))]
-        ax2.barh(cat_orders.index, cat_orders.values, color=colors_cat, edgecolor='none')
-        ax2.set_xlabel("Jumlah Order", fontsize=11)
-        ax2.set_title("Top 10 Kategori Produk berdasarkan Jumlah Order", fontsize=13, fontweight='bold')
-        ax2.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
-        ax2.spines['top'].set_visible(False)
-        ax2.spines['right'].set_visible(False)
-        plt.tight_layout()
-        st.pyplot(fig2)
-        plt.close()
-
-        top_cat = cat_orders.idxmax()
-        st.info(f"💡 **Insight:** Kategori **{top_cat}** (perlengkapan rumah tangga) menjadi yang paling banyak dipesan. "
-                f"Fokuskan stok dan promosi pada kategori ini, terutama menjelang akhir tahun.")
-
-    st.markdown("---")
-
-# ============================================================
-# VISUALISASI 3: TOP 10 NEGARA BAGIAN
-# ============================================================
-st.subheader("🗺️ Distribusi Order per Negara Bagian (Top 10)")
-st.markdown("""
-**Tujuan:** Mengidentifikasi wilayah dengan konsentrasi pelanggan terbesar  
-untuk mendukung keputusan distribusi, logistik, dan pemasaran regional.
-""")
-
-state = (
-    df_filtered.groupby('customer_state')['order_id']
-    .nunique()
-    .sort_values(ascending=False)
-    .head(10)
-)
-
-if state.empty:
-    st.warning("⚠️ Tidak ada data untuk filter yang dipilih.")
-else:
-    fig3, ax3 = plt.subplots(figsize=(10, 4))
-    colors_state = ['#1B5E20' if i == 0 else '#81C784' for i in range(len(state))]
-    ax3.bar(state.index, state.values, color=colors_state, edgecolor='none')
-    ax3.set_xlabel("Negara Bagian", fontsize=11)
-    ax3.set_ylabel("Jumlah Order", fontsize=11)
-    ax3.set_title("Top 10 Negara Bagian berdasarkan Jumlah Order", fontsize=13, fontweight='bold')
-    ax3.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
-    ax3.spines['top'].set_visible(False)
-    ax3.spines['right'].set_visible(False)
-    plt.xticks(rotation=0)
+    st.subheader("Top 10 Kategori Produk Terlaris (2016-2018)")
+    top_cat = filtered_df.groupby('product_category_name_english')['order_id'].nunique().sort_values(ascending=False).head(10)
+    fig2, ax2 = plt.subplots(figsize=(10, 4))
+    colors = sns.color_palette('Blues_r', n_colors=10)
+    ax2.barh(top_cat.index, top_cat.values, color=colors)
+    ax2.set_xlabel('Jumlah Order')
+    ax2.set_title('Top 10 Kategori Produk Terlaris')
+    ax2.xaxis.set_major_formatter(mtick.FuncFormatter(lambda x, _: f'{int(x):,}'))
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
     plt.tight_layout()
-    st.pyplot(fig3)
+    st.pyplot(fig2)
     plt.close()
 
-    top_state = state.index[0]
-    pct = (state.iloc[0] / total_orders * 100) if total_orders > 0 else 0
-    st.info(f"💡 **Insight:** **{top_state} (São Paulo)** mendominasi dengan **{state.iloc[0]:,}** order "
-            f"({pct:.1f}% dari total). Lima negara bagian teratas menyumbang lebih dari 70% total order.")
+with tab2:
+    st.subheader("Distribusi Order per Negara Bagian (2016-2018)")
+    col_a, col_b = st.columns(2)
 
-st.markdown("---")
+    with col_a:
+        state_orders = filtered_df.groupby('customer_state')['order_id'].nunique().sort_values(ascending=False).head(10)
+        fig3, ax3 = plt.subplots(figsize=(6, 5))
+        colors_s = ['#1565C0' if i == 0 else '#90CAF9' for i in range(len(state_orders))]
+        ax3.bar(state_orders.index, state_orders.values, color=colors_s)
+        ax3.set_xlabel('Negara Bagian')
+        ax3.set_ylabel('Jumlah Order')
+        ax3.set_title('Top 10 Negara Bagian')
+        ax3.yaxis.set_major_formatter(mtick.FuncFormatter(lambda x, _: f'{int(x):,}'))
+        ax3.spines['top'].set_visible(False)
+        ax3.spines['right'].set_visible(False)
+        plt.tight_layout()
+        st.pyplot(fig3)
+        plt.close()
 
-# ============================================================
-# VISUALISASI 4: RFM ANALYSIS
-# ============================================================
-st.subheader("👥 Analisis RFM — Segmentasi Pelanggan")
-st.markdown("""
-**Teknik Analisis:** RFM Analysis (Recency, Frequency, Monetary)  
-**Tujuan:** Mengelompokkan pelanggan berdasarkan perilaku transaksi untuk mendukung strategi retensi dan akuisisi yang lebih personal.
-
-| Dimensi | Penjelasan |
-|---|---|
-| **Recency (R)** | Seberapa baru pelanggan melakukan pembelian terakhir (hari) |
-| **Frequency (F)** | Seberapa sering pelanggan melakukan transaksi (jumlah order) |
-| **Monetary (M)** | Seberapa besar total pengeluaran pelanggan (R$) |
-""")
-
-if rfm_filtered.empty:
-    st.warning("⚠️ Tidak ada data untuk segmen yang dipilih.")
-else:
-    col_l, col_r = st.columns([1, 1])
-
-    with col_l:
-        seg_count = rfm_filtered['Segment'].value_counts().sort_values(ascending=True)
-        palette = sns.color_palette("RdYlGn", len(seg_count))
-        fig4, ax4 = plt.subplots(figsize=(6, 4))
-        ax4.barh(seg_count.index, seg_count.values, color=palette, edgecolor='none')
-        ax4.set_xlabel("Jumlah Pelanggan", fontsize=11)
-        ax4.set_title("Distribusi Segmen Pelanggan", fontsize=12, fontweight='bold')
-        ax4.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
-        ax4.spines['top'].set_visible(False)
-        ax4.spines['right'].set_visible(False)
+    with col_b:
+        top5 = filtered_df.groupby('customer_state')['order_id'].nunique().sort_values(ascending=False)
+        top5_data = top5.head(5)
+        others = pd.Series({'Others': top5.iloc[5:].sum()})
+        pie_data = pd.concat([top5_data, others])
+        fig4, ax4 = plt.subplots(figsize=(6, 5))
+        ax4.pie(pie_data.values, labels=pie_data.index, autopct='%1.1f%%',
+                colors=sns.color_palette('Set2', n_colors=6), startangle=90)
+        ax4.set_title('Proporsi Order per Negara Bagian')
         plt.tight_layout()
         st.pyplot(fig4)
         plt.close()
 
-    with col_r:
-        st.markdown("#### 📋 Ringkasan per Segmen")
-        cols_available = ['Segment']
-        if 'Monetary' in rfm_filtered.columns:
-            cols_available.append('Monetary')
-        if 'Frequency' in rfm_filtered.columns:
-            cols_available.append('Frequency')
-        if 'Recency' in rfm_filtered.columns:
-            cols_available.append('Recency')
+with tab3:
+    st.subheader("Segmentasi Pelanggan (RFM Analysis 2016-2018)")
+    col_c, col_d = st.columns(2)
 
-        agg_dict = {'Segment': 'count'}
-        if 'Monetary' in rfm_filtered.columns:
-            agg_dict['Monetary'] = 'mean'
-        if 'Frequency' in rfm_filtered.columns:
-            agg_dict['Frequency'] = 'mean'
-        if 'Recency' in rfm_filtered.columns:
-            agg_dict['Recency'] = 'mean'
+    with col_c:
+        seg_counts = rfm_df['Segment'].value_counts().sort_values()
+        colors_rfm = sns.color_palette('RdYlGn', n_colors=len(seg_counts))
+        fig5, ax5 = plt.subplots(figsize=(6, 5))
+        ax5.barh(seg_counts.index, seg_counts.values, color=colors_rfm)
+        for i, v in enumerate(seg_counts.values):
+            ax5.text(v + 50, i, f'{v:,}', va='center', fontsize=8)
+        ax5.set_xlabel('Jumlah Pelanggan')
+        ax5.set_title('Distribusi Segmen Pelanggan')
+        ax5.spines['top'].set_visible(False)
+        ax5.spines['right'].set_visible(False)
+        plt.tight_layout()
+        st.pyplot(fig5)
+        plt.close()
 
-        rfm_summary = rfm_filtered.groupby('Segment').agg(agg_dict).rename(
-            columns={'Segment': 'Jumlah', 'Monetary': 'Avg Spend (R$)',
-                     'Frequency': 'Avg Order', 'Recency': 'Avg Recency (hari)'}
-        ).sort_values('Jumlah', ascending=False).reset_index()
+    with col_d:
+        segment_colors = {
+            'Champions': '#2E7D32',
+            'Loyal Customers': '#66BB6A',
+            'Recent Customers': '#AED581',
+            'Potential Loyalists': '#FFF176',
+            'Customers Needing Attention': '#FFB74D',
+            'At Risk': '#EF5350',
+            'Lost Customers': '#B71C1C'
+        }
+        fig6, ax6 = plt.subplots(figsize=(6, 5))
+        for seg, color in segment_colors.items():
+            subset = rfm_df[rfm_df['Segment'] == seg]
+            ax6.scatter(subset['Recency'], subset['Monetary'],
+                       c=color, label=seg, alpha=0.5, s=10)
+        ax6.set_xlabel('Recency (hari)')
+        ax6.set_ylabel('Monetary (R$)')
+        ax6.set_title('Sebaran Pelanggan: Recency vs Monetary')
+        ax6.legend(loc='upper right', fontsize=7)
+        ax6.spines['top'].set_visible(False)
+        ax6.spines['right'].set_visible(False)
+        plt.tight_layout()
+        st.pyplot(fig6)
+        plt.close()
 
-        if 'Avg Spend (R$)' in rfm_summary.columns:
-            rfm_summary['Avg Spend (R$)'] = rfm_summary['Avg Spend (R$)'].map(lambda x: f"R$ {x:,.0f}")
-        if 'Avg Order' in rfm_summary.columns:
-            rfm_summary['Avg Order'] = rfm_summary['Avg Order'].map(lambda x: f"{x:.1f}x")
-        if 'Avg Recency (hari)' in rfm_summary.columns:
-            rfm_summary['Avg Recency (hari)'] = rfm_summary['Avg Recency (hari)'].map(lambda x: f"{x:.0f} hari")
-
-        st.dataframe(rfm_summary, use_container_width=True, hide_index=True)
-
-        st.markdown("""
-        **Rekomendasi Strategi:**
-        - 🏆 **Champions** → Program VIP & reward eksklusif
-        - ⚠️ **At Risk** → Re-engagement campaign
-        - 🆕 **Recent** → Email nurturing & diskon repeat order
-        - ❌ **Lost** → Win-back campaign dengan insentif besar
-        """)
-
-    top_seg = rfm_filtered['Segment'].value_counts().idxmax()
-    st.info(f"💡 **Insight:** Segmen terbesar adalah **{top_seg}** — menunjukkan tantangan customer retention yang perlu segera diatasi. "
-            f"Fokuskan budget pada program re-engagement dan loyalitas.")
+    st.markdown("---")
+    st.subheader("Rekomendasi Strategi per Segmen")
+    strategies = {
+        'Champions': ('🏆', '#2E7D32', 'Berikan program reward eksklusif dan early access produk baru.'),
+        'Loyal Customers': ('⭐', '#66BB6A', 'Tawarkan program loyalitas bertingkat dan personalisasi produk.'),
+        'Recent Customers': ('🆕', '#AED581', 'Kirim email nurturing dan diskon untuk repeat purchase.'),
+        'Potential Loyalists': ('💡', '#F9A825', 'Berikan penawaran bundle dan reminder produk.'),
+        'Customers Needing Attention': ('⚠️', '#FF7043', 'Kirim survei kepuasan dan penawaran limited-time.'),
+        'At Risk': ('🔴', '#EF5350', 'Luncurkan re-engagement campaign dengan diskon besar.'),
+        'Lost Customers': ('💔', '#B71C1C', 'Win-back campaign dengan insentif maksimal.')
+    }
+    for seg, (icon, color, desc) in strategies.items():
+        if seg in rfm_df['Segment'].values:
+            n = rfm_df[rfm_df['Segment'] == seg].shape[0]
+            st.markdown(f"""
+            <div style='background:#f9f9f9;border-left:4px solid {color};
+            padding:10px 14px;margin:6px 0;border-radius:0 8px 8px 0'>
+                <b>{icon} {seg}</b> <span style='color:#666;font-size:12px'>({n:,} pelanggan)</span><br>
+                <span style='font-size:13px'>{desc}</span>
+            </div>""", unsafe_allow_html=True)
 
 st.markdown("---")
-
-# ============================================================
-# FOOTER
-# ============================================================
-st.markdown("""
-<div style='text-align: center; color: grey; font-size: 13px; padding: 10px;'>
-    🛒 Brazilian E-Commerce Dashboard &nbsp;|&nbsp; Dibuat dengan Streamlit &nbsp;|&nbsp;
-    Data: <a href='https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce' target='_blank'>Olist Public Dataset</a>
-</div>
-""", unsafe_allow_html=True)
+st.markdown("<div style='text-align:center;color:#888;font-size:12px'>E-Commerce Brasil Dashboard | Data: Olist 2016-2018</div>", 
+            unsafe_allow_html=True)

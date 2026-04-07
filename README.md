@@ -1,42 +1,60 @@
-\# Proyek Analisis Data: Brazilian E-Commerce Public Dataset
+Proyek Analisis Data: Brazilian E-Commerce Public Dataset
+
+Tentang Proyek
+
+Proyek ini merupakan analisis data dari Brazilian E-Commerce Public Dataset by Olist yang tersedia di Kaggle. Dataset berisi data transaksi pelanggan, order, produk, pembayaran, dan wilayah pelanggan. Analisis dilakukan untuk menjawab pertanyaan bisnis terkait tren penjualan, distribusi geografis pelanggan, dan segmentasi pelanggan menggunakan metode RFM Analysis.
+
+Pertanyaan Bisnis
 
 
 
-\## Tentang Proyek
+1. Bagaimana tren penjualan bulanan dan kategori produk apa yang paling banyak terjual selama periode 2016–2018?
 
-Proyek ini merupakan analisis data dari dataset e-commerce Brasil milik Olist. Dataset mencakup data transaksi dari tahun 2016 hingga 2018. Analisis dilakukan untuk menjawab beberapa pertanyaan bisnis terkait penjualan, distribusi pelanggan, dan segmentasi pelanggan.
+2\. Bagaimana distribusi geografis pelanggan di seluruh Brasil, dan kota/negara bagian mana yang memiliki volume order terbanyak selama periode 2016–2018?
 
-
-
-\## Pertanyaan Bisnis
-
-1\. Bagaimana tren penjualan bulanan dan kategori produk apa yang paling banyak terjual?
-
-2\. Bagaimana distribusi geografis pelanggan di Brasil?
-
-3\. Bagaimana segmentasi pelanggan berdasarkan metode RFM Analysis?
+3\. Bagaimana segmentasi pelanggan berdasarkan perilaku pembelian mereka menggunakan metode RFM Analysis selama periode 2016–2018, dan strategi apa yang tepat untuk setiap segmen?
 
 
 
-\## Cara Menjalankan Dashboard
+Setup Environment - Anaconda
+
+conda create --name main-ds python=3.9
+
+conda activate main-ds
 
 pip install -r requirements.txt
+
+
+
+Setup Environment - Shell/Terminal
+
+mkdir proyek\_analisis\_data
+
+cd proyek\_analisis\_data
+
+pipenv install
+
+pipenv shell
+
+pip install -r requirements.txt
+
+Run Streamlit App
 
 streamlit run dashboard/dashboard.py
 
 
 
-\## Link Dashboard
+Link Dashboard
 
 https://ecommerce-dashboard-sayesaye45.streamlit.app/
 
 
 
-\## Identitas
+Identitas
 
-\- Nama: Kurnia Irianti
+Nama: Kurnia Irianti
 
-\- Email: kurniairianti21@gmail.com
+Email: kurniairianti21@gmail.com
 
-\- ID Dicoding: cdcc228d6x2404
+ID Dicoding: cdcc228d6x2404
 
