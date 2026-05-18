@@ -8,7 +8,7 @@ Pertanyaan Bisnis
 
 
 
-1. Bagaimana tren penjualan bulanan dan kategori produk apa yang paling banyak terjual selama periode 2016–2018?
+1\. Bagaimana tren penjualan bulanan dan kategori produk apa yang paling banyak terjual selama periode 2016–2018?
 
 2\. Bagaimana distribusi geografis pelanggan di seluruh Brasil, dan kota/negara bagian mana yang memiliki volume order terbanyak selama periode 2016–2018?
 
